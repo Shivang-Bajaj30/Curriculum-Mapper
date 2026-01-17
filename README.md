@@ -43,6 +43,8 @@ Using **semantic similarity (AI/ML)**, the system:
 
 ### Programming Language
 - **Python**
+- **React**
+- **Flask API**
 
 ### Libraries & Frameworks
 - **pandas** – data cleaning and manipulation  
