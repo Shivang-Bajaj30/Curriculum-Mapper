@@ -22,6 +22,10 @@ body {
   background-color: #050814;
 }
 
+body.theme-light {
+  background-color: #fefefe;
+}
+
 #root {
   min-height: 100vh;
 }
