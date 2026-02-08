@@ -1,9 +1,33 @@
+import { useState, useRef, useEffect } from 'react'
 import './App.css'
 
+type Theme = 'dark' | 'light'
+
 function App() {
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
+  const [theme, setTheme] = useState<Theme>('dark')
+  const profileRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileMenuOpen(false)
+      }
+    }
+    if (profileMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [profileMenuOpen])
+
+  useEffect(() => {
+    document.body.classList.toggle('theme-light', theme === 'light')
+  }, [theme])
+
   return (
-    <div className="app">
-      <header className="app-header">
+    <div className={`app theme-${theme}`}>
+      <nav className="nav-bar">
+        <header className="app-header">
         <div className="brand">
           <div className="brand-mark">CM</div>
           <div className="brand-text">
@@ -13,24 +37,84 @@ function App() {
         </div>
 
         <nav className="nav">
-          <button className="nav-link" type="button">
-            Privacy
-          </button>
+          <div className="theme-switch" role="group" aria-label="Theme">
+            <button
+              className={`theme-switch-btn ${theme === 'dark' ? 'active' : ''}`}
+              type="button"
+              onClick={() => setTheme('dark')}
+              aria-pressed={theme === 'dark'}
+            >
+              Dark
+            </button>
+            <button
+              className={`theme-switch-btn ${theme === 'light' ? 'active' : ''}`}
+              type="button"
+              onClick={() => setTheme('light')}
+              aria-pressed={theme === 'light'}
+            >
+              Light
+            </button>
+          </div>
           <button className="nav-link" type="button">
             Login
           </button>
-          <button className="nav-avatar" type="button" aria-label="Profile">
-            <span className="nav-avatar-initial">R</span>
-          </button>
+          <div className="nav-avatar-wrap" ref={profileRef}>
+            <button
+              className="nav-avatar"
+              type="button"
+              aria-label="Profile"
+              aria-expanded={profileMenuOpen}
+              aria-haspopup="true"
+              onClick={() => setProfileMenuOpen((o) => !o)}
+            >
+              <span className="nav-avatar-initial">R</span>
+            </button>
+            {profileMenuOpen && (
+              <div className="profile-menu" role="menu">
+                <button className="profile-menu-item" type="button" role="menuitem">
+                  Profile
+                </button>
+                <button className="profile-menu-item" type="button" role="menuitem">
+                  Settings
+                </button>
+                <button className="profile-menu-item" type="button" role="menuitem">
+                  Privacy Policy
+                </button>
+                <button className="profile-menu-item" type="button" role="menuitem">
+                  Log out
+                </button>
+              </div>
+            )}
+          </div>
         </nav>
-      </header>
+        </header>
+      </nav>
 
       <main className="app-main">
         <section className="hero" aria-label="Curriculum mapper introduction">
-          <p className="hero-kicker">Smart curriculum mapping</p>
+          {theme === 'dark' && (
+            <p className="hero-kicker">Smart curriculum mapping</p>
+          )}
           <h1 className="hero-title">
             Turn messy syllabi into a clear, searchable map.
           </h1>
+          {theme === 'light' && (
+            <div className="hero-decorations" aria-hidden="true">
+              <div className="hero-dotted-circle hero-dotted-1" />
+              <div className="hero-dotted-circle hero-dotted-2" />
+              <div className="hero-dotted-circle hero-dotted-3" />
+              <svg className="hero-scribble hero-scribble-1" viewBox="0 0 120 40" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <path d="M5 20 Q30 5 60 20 T115 25" />
+              </svg>
+              <svg className="hero-scribble hero-scribble-2" viewBox="0 0 80 30" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round">
+                <path d="M10 25 Q40 10 70 20" />
+              </svg>
+              <svg className="hero-graffiti hero-graffiti-1" viewBox="0 0 100 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round">
+                <path d="M5 18 Q25 8 50 15 Q75 22 95 12" />
+              </svg>
+              <div className="hero-doodle" />
+            </div>
+          )}
           <p className="hero-subtitle">
             Drop in your curriculum files and instantly search topics, skills,
             and learning outcomes—just like chatting with an AI.
