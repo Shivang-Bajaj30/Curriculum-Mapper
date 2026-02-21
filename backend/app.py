@@ -23,3 +23,7 @@ def upload():
     if not names:
         return jsonify({"error": "no files provided"}), 400
     return jsonify({"uploaded": names})
+
+@app.route("/api/health", methods=["GET"])
+def health():
+    return jsonify({"status": "ok", "message": "Backend is running"})
