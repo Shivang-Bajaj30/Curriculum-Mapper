@@ -735,3 +735,28 @@
     font-size: 1.9rem;
   }
 }
+
+/* Backend connection & API feedback */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.search-result {
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+  color: rgba(245, 245, 240, 0.85);
+}
+
+.dropzone-status {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: rgba(245, 245, 240, 0.7);
+}
