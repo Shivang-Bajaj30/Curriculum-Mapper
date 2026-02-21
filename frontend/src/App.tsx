@@ -1,12 +1,19 @@
 import { useState, useRef, useEffect } from 'react'
 import './App.css'
+import * as api from './api/client'
 
 type Theme = 'dark' | 'light'
 
 function App() {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [theme, setTheme] = useState<Theme>('dark')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResult, setSearchResult] = useState<string | null>(null)
+  const [searching, setSearching] = useState(false)
+  const [uploadedFiles, setUploadedFiles] = useState<string[]>([])
+  const [uploading, setUploading] = useState(false)
   const profileRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -23,6 +30,36 @@ function App() {
   useEffect(() => {
     document.body.classList.toggle('theme-light', theme === 'light')
   }, [theme])
+
+  async function handleSearch() {
+    if (!searchQuery.trim()) return
+    setSearching(true)
+    setSearchResult(null)
+    try {
+      const data = await api.search(searchQuery.trim())
+      setSearchResult(data.message ?? `Found ${(data.results ?? []).length} result(s).`)
+    } catch (e) {
+      setSearchResult(e instanceof Error ? e.message : 'Search failed')
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  async function handleFiles(files: FileList | null) {
+    if (!files?.length) return
+    const list = Array.from(files)
+    setUploading(true)
+    setUploadedFiles([])
+    try {
+      const data = await api.upload(list)
+      setUploadedFiles(data.uploaded ?? [])
+    } catch (e) {
+      setUploadedFiles([])
+      setSearchResult(e instanceof Error ? e.message : 'Upload failed')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   return (
     <div className={`app theme-${theme}`}>
@@ -137,7 +174,27 @@ function App() {
 
         <section className="workspace" aria-label="Upload and search">
           <div className="drop-search">
-            <div className="dropzone" role="button" tabIndex={0}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+              className="visually-hidden"
+              aria-hidden
+              onChange={(e) => handleFiles(e.target.files)}
+            />
+            <div
+              className="dropzone"
+              role="button"
+              tabIndex={0}
+              onClick={() => fileInputRef.current?.click()}
+              onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault()
+                handleFiles(e.dataTransfer?.files ?? null)
+              }}
+            >
               <div className="dropzone-inner">
                 <div className="dropzone-icon">⤓</div>
                 <div className="dropzone-copy">
@@ -145,6 +202,10 @@ function App() {
                   <p className="dropzone-subtitle">
                     Or click to browse files. We support PDF, DOCX, and TXT.
                   </p>
+                  {uploading && <p className="dropzone-status">Uploading…</p>}
+                  {uploadedFiles.length > 0 && (
+                    <p className="dropzone-status">Uploaded: {uploadedFiles.join(', ')}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -154,23 +215,36 @@ function App() {
                 <input
                   className="search-input"
                   type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                   placeholder="Ask anything about your curriculum..."
                   aria-label="Search within your curriculum"
                 />
-                <button className="search-button" type="button">
-                  Search
+                <button
+                  className="search-button"
+                  type="button"
+                  disabled={searching || !searchQuery.trim()}
+                  onClick={handleSearch}
+                >
+                  {searching ? 'Searching…' : 'Search'}
                 </button>
               </div>
+              {searchResult && (
+                <p className="search-result" role="status">
+                  {searchResult}
+                </p>
+              )}
 
               <div className="search-hints">
                 <span className="hint-label">Try:</span>
-                <button className="hint-pill" type="button">
+                <button className="hint-pill" type="button" onClick={() => { setSearchQuery('Map topics to standards'); setSearchResult(null); }}>
                   Map topics to standards
                 </button>
-                <button className="hint-pill" type="button">
+                <button className="hint-pill" type="button" onClick={() => { setSearchQuery('Find gaps in week 3'); setSearchResult(null); }}>
                   Find gaps in week 3
                 </button>
-                <button className="hint-pill" type="button">
+                <button className="hint-pill" type="button" onClick={() => { setSearchQuery('List all learning outcomes'); setSearchResult(null); }}>
                   List all learning outcomes
                 </button>
               </div>
