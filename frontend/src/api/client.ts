@@ -3,7 +3,7 @@
  * In dev, Vite proxies /api to the Flask server (see vite.config.ts).
  */
 
-const API_BASE = 'http://127.0.0.1:5000'
+const API_BASE = ''
 
 export async function getHealth(): Promise<{ status: string; message: string }> {
   const res = await fetch(`${API_BASE}/api/health`)
