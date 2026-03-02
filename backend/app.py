@@ -2,8 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS 
 
 app = Flask(__name__)
-CORS(app)
-
+CORS(app, resources={r"/api/*": {"origins": "*", "methods": ["GET", "POST", "OPTIONS"], "allow_headers": ["*"]}})
 @app.route("/")
 def index():
     return "<p>Hello, World!</p>"
