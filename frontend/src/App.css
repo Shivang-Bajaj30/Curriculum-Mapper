@@ -33,6 +33,10 @@
   display: flex;
   align-items: center;
   gap: 0.9rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
 }
 
 .brand-mark {
@@ -53,6 +57,8 @@
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
+  align-items: flex-start;
+  text-align: left;
 }
 
 .brand-title {
@@ -461,19 +467,22 @@
 
 /* Light theme: white, black/dark grey, yellow */
 .app.theme-light {
-  background: radial-gradient(circle at top left, rgba(251, 191, 36, 0.12), transparent 55%),
-    radial-gradient(circle at bottom right, rgba(251, 191, 36, 0.06), transparent 55%),
-    #fefefe;
+  background: url('/swirl-bg.png') top center / cover no-repeat fixed;
   color: #0f172a;
 }
 
 .app.theme-light .nav-bar {
-  background: rgba(254, 254, 254, 0.95);
-  border-bottom-color: rgba(15, 23, 42, 0.1);
+  background: rgba(251, 191, 36, 0.88);
+  border-bottom: 1px solid rgba(180, 130, 0, 0.25);
+  backdrop-filter: blur(8px);
 }
 
 .app.theme-light .brand-subtitle {
-  color: rgba(15, 23, 42, 0.6);
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.app.theme-light .brand-title {
+  color: #000000 !important;
 }
 
 .app.theme-light .brand-mark {
@@ -548,97 +557,7 @@
   color: #0f172a;
 }
 
-/* Light theme: yellow decorative elements under heading */
-.app.theme-light .hero {
-  position: relative;
-}
-
-.app.theme-light .hero-decorations {
-  position: absolute;
-  top: 3.5rem;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 38rem;
-  height: 5rem;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.app.theme-light .hero-title {
-  position: relative;
-  z-index: 1;
-}
-
-.app.theme-light .hero-dotted-circle {
-  position: absolute;
-  border: 2px dashed rgba(251, 191, 36, 0.55);
-  border-radius: 50%;
-  background: transparent;
-}
-
-.app.theme-light .hero-dotted-1 {
-  width: 3rem;
-  height: 3rem;
-  top: 0.5rem;
-  left: 10%;
-}
-
-.app.theme-light .hero-dotted-2 {
-  width: 1.5rem;
-  height: 1.5rem;
-  top: 2rem;
-  right: 15%;
-}
-
-.app.theme-light .hero-dotted-3 {
-  width: 2.25rem;
-  height: 2.25rem;
-  top: 0;
-  right: 35%;
-}
-
-.app.theme-light .hero-scribble,
-.app.theme-light .hero-graffiti {
-  position: absolute;
-  color: rgba(251, 191, 36, 0.5);
-  stroke: rgba(251, 191, 36, 0.5);
-}
-
-.app.theme-light .hero-scribble-1 {
-  width: 5rem;
-  height: 1.75rem;
-  top: 1rem;
-  left: 0;
-  transform: rotate(-8deg);
-}
-
-.app.theme-light .hero-scribble-2 {
-  width: 3.5rem;
-  height: 1.25rem;
-  top: 2.5rem;
-  right: 5%;
-  transform: rotate(12deg);
-}
-
-.app.theme-light .hero-graffiti-1 {
-  width: 4rem;
-  height: 1rem;
-  top: 0.25rem;
-  right: 0;
-  transform: rotate(-4deg);
-}
-
-.app.theme-light .hero-doodle {
-  position: absolute;
-  width: 1.75rem;
-  height: 1.75rem;
-  top: 2rem;
-  left: 30%;
-  border: 2px dashed rgba(251, 191, 36, 0.5);
-  border-radius: 50%;
-  transform: rotate(20deg);
-}
+/* Light theme: no decorative elements behind text */
 
 .app.theme-light .hero-subtitle {
   position: relative;
