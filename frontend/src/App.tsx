@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import './App.css'
 import * as api from './api/client'
+import type { AnalysisResult } from './api/client'
 
 type Theme = 'dark' | 'light'
 type Page = 'home' | 'about' | 'login' | 'signup'
@@ -13,9 +14,12 @@ function App() {
   const [persona, setPersona] = useState<Persona>('students')
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResult, setSearchResult] = useState<string | null>(null)
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
   const [searching, setSearching] = useState(false)
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([])
+  const [extractedTopics, setExtractedTopics] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
+  const [extractionStatus, setExtractionStatus] = useState<'idle' | 'extracting' | 'done' | 'error'>('idle')
   const profileRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -42,13 +46,22 @@ function App() {
 
   async function handleSearch() {
     if (!searchQuery.trim()) return
+    if (extractedTopics.length === 0) {
+      setSearchResult('Please upload a curriculum file first so the AI can extract its topics.')
+      return
+    }
     setSearching(true)
     setSearchResult(null)
+    setAnalysisResult(null)
     try {
-      const data = await api.search(searchQuery.trim())
-      setSearchResult(data.message ?? `Found ${(data.results ?? []).length} result(s).`)
+      const data = await api.analyze(searchQuery.trim(), extractedTopics)
+      if (data.success && data.analysis) {
+        setAnalysisResult(data.analysis)
+      } else {
+        setSearchResult('Analysis returned no results.')
+      }
     } catch (e) {
-      setSearchResult(e instanceof Error ? e.message : 'Search failed')
+      setSearchResult(e instanceof Error ? e.message : 'Analysis failed. Make sure the backend is running with a valid GEMINI_API_KEY.')
     } finally {
       setSearching(false)
     }
@@ -59,11 +72,23 @@ function App() {
     const list = Array.from(files)
     setUploading(true)
     setUploadedFiles([])
+    setExtractedTopics([])
+    setExtractionStatus('extracting')
+    setAnalysisResult(null)
+    setSearchResult(null)
     try {
       const data = await api.upload(list)
       setUploadedFiles(data.uploaded ?? [])
+      if (data.topics && data.topics.length > 0) {
+        setExtractedTopics(data.topics)
+        setExtractionStatus('done')
+      } else {
+        setExtractionStatus('error')
+        setSearchResult(data.warning ?? 'No topics could be extracted from the file.')
+      }
     } catch (e) {
       setUploadedFiles([])
+      setExtractionStatus('error')
       setSearchResult(e instanceof Error ? e.message : 'Upload failed')
     } finally {
       setUploading(false)
@@ -240,8 +265,14 @@ function App() {
                       <p className="dropzone-subtitle">
                         Or click to browse files. We support PDF, DOCX, and TXT.
                       </p>
-                      {uploading && <p className="dropzone-status">Uploading…</p>}
-                      {uploadedFiles.length > 0 && (
+                      {uploading && <p className="dropzone-status status-loading">⏳ Uploading and extracting topics with AI…</p>}
+                      {!uploading && extractionStatus === 'done' && (
+                        <p className="dropzone-status status-success">✅ {extractedTopics.length} topics extracted — ready to analyse</p>
+                      )}
+                      {!uploading && extractionStatus === 'error' && (
+                        <p className="dropzone-status status-error">⚠️ Topic extraction failed. Try a different file.</p>
+                      )}
+                      {!uploading && uploadedFiles.length > 0 && extractionStatus !== 'done' && extractionStatus !== 'error' && (
                         <p className="dropzone-status">Uploaded: {uploadedFiles.join(', ')}</p>
                       )}
                     </div>
@@ -256,7 +287,7 @@ function App() {
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                      placeholder="Ask anything about your curriculum..."
+                      placeholder="Enter a role or keywords (e.g. Data Engineer, UiPath Developer)..."
                       aria-label="Search within your curriculum"
                     />
                     <button
@@ -265,7 +296,7 @@ function App() {
                       disabled={searching || !searchQuery.trim()}
                       onClick={handleSearch}
                     >
-                      {searching ? 'Searching…' : 'Search'}
+                      {searching ? 'Analysing…' : 'Analyse'}
                     </button>
                   </div>
                   {searchResult && (
@@ -274,37 +305,97 @@ function App() {
                     </p>
                   )}
 
+                  {analysisResult && (
+                    <div className="ai-analysis-panel" role="region" aria-label="AI analysis results">
+                      <div className="analysis-header">
+                        <div className="analysis-title-row">
+                          <div className="analysis-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="10" />
+                              <path d="M12 16v-4M12 8h.01" />
+                            </svg>
+                          </div>
+                          <div>
+                            <h3 className="analysis-title">AI Curriculum Analysis</h3>
+                            <p className="analysis-query">Role / Keywords: <span>{searchQuery}</span></p>
+                          </div>
+                        </div>
+                        <div className="analysis-score-wrap" aria-label={`Compatibility score: ${analysisResult.compatibility_score}%`}>
+                          <svg className="score-ring" viewBox="0 0 44 44" aria-hidden="true">
+                            <circle className="score-ring-bg" cx="22" cy="22" r="18" />
+                            <circle
+                              className="score-ring-fill"
+                              cx="22" cy="22" r="18"
+                              strokeDasharray={`${(analysisResult.compatibility_score / 100) * 113.1} 113.1`}
+                              style={{ stroke: analysisResult.compatibility_score >= 70 ? '#7c3aed' : analysisResult.compatibility_score >= 40 ? '#2563eb' : '#334155' }}
+                            />
+                          </svg>
+                          <div className="score-label">
+                            <span className="score-value">{analysisResult.compatibility_score}%</span>
+                            <span className="score-text">match</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="analysis-summary">
+                        <p>{analysisResult.summary}</p>
+                      </div>
+
+                      {analysisResult.pointers && analysisResult.pointers.length > 0 && (
+                        <div className="analysis-pointers">
+                          <p className="pointers-label">Compatibility Breakdown</p>
+                          <ul className="pointers-list">
+                            {analysisResult.pointers.map((pointer, idx) => (
+                              <li key={idx} className={`pointer-item pointer-${pointer.match_level}`}>
+                                <div className="pointer-header">
+                                  <span className={`pointer-badge badge-${pointer.match_level}`}>
+                                    {pointer.match_level === 'high' ? '▲ High' : pointer.match_level === 'medium' ? '◆ Medium' : '▼ Low'}
+                                  </span>
+                                  <span className="pointer-topic">{pointer.topic}</span>
+                                </div>
+                                <p className="pointer-relevance">{pointer.relevance}</p>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="search-hints">
                     <span className="hint-label">Try:</span>
                     <button
                       className="hint-pill"
                       type="button"
                       onClick={() => {
-                        setSearchQuery('Map topics to standards')
+                        setSearchQuery('Data Engineer')
                         setSearchResult(null)
+                        setAnalysisResult(null)
                       }}
                     >
-                      Map topics to standards
+                      Data Engineer
                     </button>
                     <button
                       className="hint-pill"
                       type="button"
                       onClick={() => {
-                        setSearchQuery('Find gaps in week 3')
+                        setSearchQuery('RPA Developer')
                         setSearchResult(null)
+                        setAnalysisResult(null)
                       }}
                     >
-                      Find gaps in week 3
+                      RPA Developer
                     </button>
                     <button
                       className="hint-pill"
                       type="button"
                       onClick={() => {
-                        setSearchQuery('List all learning outcomes')
+                        setSearchQuery('Machine Learning, Python, Automation')
                         setSearchResult(null)
+                        setAnalysisResult(null)
                       }}
                     >
-                      List all learning outcomes
+                      ML & Automation skills
                     </button>
                   </div>
                 </div>
