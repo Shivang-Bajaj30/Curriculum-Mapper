@@ -112,10 +112,9 @@ function App() {
             onClick={() => goTo('home')}
             aria-label="Go to home"
           >
-            <div className="brand-mark">CM</div>
             <div className="brand-text">
-              <span className="brand-title">Curriculum Mapper</span>
-              <span className="brand-subtitle">AI-powered course design</span>
+              <span className="brand-title">ORCA</span>
+              <span className="brand-subtitle">Navigate your career with precision.</span>
             </div>
           </button>
 
@@ -226,50 +225,13 @@ function App() {
       <main className="app-main">
         {activePage === 'home' && (
           <>
-            <section className="hero" aria-label="Curriculum mapper introduction">
-              {theme === 'dark' && <p className="hero-kicker">Smart curriculum mapping</p>}
-              <h1 className="hero-title">Turn messy syllabi into a clear, searchable map.</h1>
-              {theme === 'light' && (
-                <div className="hero-decorations" aria-hidden="true">
-                  <div className="hero-dotted-circle hero-dotted-1" />
-                  <div className="hero-dotted-circle hero-dotted-2" />
-                  <div className="hero-dotted-circle hero-dotted-3" />
-                  <svg
-                    className="hero-scribble hero-scribble-1"
-                    viewBox="0 0 120 40"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                  >
-                    <path d="M5 20 Q30 5 60 20 T115 25" />
-                  </svg>
-                  <svg
-                    className="hero-scribble hero-scribble-2"
-                    viewBox="0 0 80 30"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.2"
-                    strokeLinecap="round"
-                  >
-                    <path d="M10 25 Q40 10 70 20" />
-                  </svg>
-                  <svg
-                    className="hero-graffiti hero-graffiti-1"
-                    viewBox="0 0 100 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1"
-                    strokeLinecap="round"
-                  >
-                    <path d="M5 18 Q25 8 50 15 Q75 22 95 12" />
-                  </svg>
-                  <div className="hero-doodle" />
-                </div>
-              )}
+            <section className="hero" aria-label="ORCA career navigation">
+              {theme === 'dark' && <p className="hero-kicker">AI-powered career navigation</p>}
+              <h1 className="hero-title">Navigate your career with precision.</h1>
+
               <p className="hero-subtitle">
-                Drop in your curriculum files and instantly search topics, skills, and learning outcomes—just like
-                chatting with an AI.
+                Upload your resume and let ORCA map your skills to the right opportunities, identify gaps, and chart the
+                exact steps to get where you want to go.
               </p>
             </section>
 
