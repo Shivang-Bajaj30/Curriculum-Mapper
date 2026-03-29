@@ -5,6 +5,8 @@ import json
 import time
 import tempfile
 
+from skillToJob2 import skills_to_job_roles
+
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*", "methods": ["GET", "POST", "OPTIONS"], "allow_headers": ["*"]}})
 
@@ -55,49 +57,88 @@ def extract_text_from_file(filepath: str, filename: str) -> str:
     return ""
 
 
-def extract_topics_with_ai(text: str) -> list:
-    """Use Gemini to extract a clean list of course topics from raw curriculum text."""
+def _strip_json_fence(response_text: str) -> str:
+    response_text = response_text.strip()
+    if response_text.startswith("```"):
+        lines = response_text.split("\n")
+        inner = []
+        for line in lines[1:]:
+            if line.strip() == "```":
+                break
+            inner.append(line)
+        response_text = "\n".join(inner)
+    return response_text.strip()
+
+
+def extract_extracted_content_with_ai(text: str) -> dict:
+    """
+    Use Gemini to return structured JSON:
+    { "extracted_content": [ { "topics": [ "skill1", "skill2", ... ] } ] }
+    Topics = important technical / academic skills from the curriculum.
+    """
     MAX_CHARS = 50000
     if len(text) > MAX_CHARS:
         text = text[:MAX_CHARS] + "\n\n[Document truncated...]"
 
     model = get_gemini_model()
 
-    prompt = f"""You are a curriculum analysis expert. Extract ALL distinct academic/technical topics, skills, and concepts from the curriculum document below.
+    prompt = f"""You are a curriculum and skills analyst. Read the curriculum document and extract the most important technical and transferable SKILLS and TOPICS
+(students would list these on a resume or LinkedIn). Include tools, frameworks, languages, methods, and domain concepts.
 
-Return ONLY a valid JSON array of strings. Each string is one topic. Be specific and comprehensive.
+Return ONLY valid JSON with this exact shape (no markdown, no explanation):
+{{
+  "extracted_content": [
+    {{
+      "topics": ["skill or topic 1", "skill or topic 2", "..."]
+    }}
+  ]
+}}
 
-Example output:
-["Robotic Process Automation", "UiPath Studio", "Machine Learning", "Data Preprocessing"]
+Rules:
+- Put ALL skills/topics in the single "topics" array inside the first object of "extracted_content".
+- Aim for 15–40 distinct items when the document is rich; fewer if the document is short.
+- Be specific (e.g. "Python", "REST APIs", "Machine Learning") not vague ("communication").
 
 CURRICULUM TEXT:
 ---
 {text}
----
-
-Return ONLY the JSON array. No explanation, no markdown."""
+---"""
 
     for attempt in range(3):
         try:
             response = model.generate_content(prompt)
-            response_text = response.text.strip()
-            # Strip markdown fences if present
-            if response_text.startswith("```"):
-                lines = response_text.split("\n")
-                inner = []
-                for line in lines[1:]:
-                    if line.strip() == "```":
-                        break
-                    inner.append(line)
-                response_text = "\n".join(inner)
-            topics = json.loads(response_text)
-            if isinstance(topics, list):
-                return [str(t) for t in topics if t]
+            response_text = _strip_json_fence(response.text)
+            data = json.loads(response_text)
+            if not isinstance(data, dict):
+                continue
+            ec = data.get("extracted_content")
+            if not isinstance(ec, list) or not ec:
+                continue
+            first = ec[0] if isinstance(ec[0], dict) else {}
+            topics = first.get("topics")
+            if not isinstance(topics, list):
+                topics = []
+            topics = [str(t).strip() for t in topics if t and str(t).strip()]
+            data["extracted_content"] = [{"topics": topics}]
+            return data
         except Exception as e:
             if attempt == 2:
                 raise e
             time.sleep(2)
-    return []
+
+    return {"extracted_content": [{"topics": []}]}
+
+
+def topics_flat_from_extracted(data: dict) -> list[str]:
+    """Flatten topics from extracted_content for skill→job matching."""
+    out = []
+    ec = data.get("extracted_content") or []
+    for block in ec:
+        if isinstance(block, dict):
+            t = block.get("topics") or []
+            if isinstance(t, list):
+                out.extend(str(x).strip() for x in t if x and str(x).strip())
+    return out
 
 
 @app.route("/")
@@ -114,7 +155,7 @@ def health():
 def upload():
     """
     Upload curriculum files, extract text, then use AI to produce a clean topics list.
-    Returns: { uploaded: [...], topics: [...], preview: "..." }
+    Returns: { uploaded: [...], topics: [...], job_matches: [...], preview: "..." }
     """
     files = request.files.getlist("files") or request.files.getlist("file")
     uploaded_names = [f.filename for f in files if f.filename]
@@ -126,7 +167,6 @@ def upload():
     for f in files:
         if not f.filename:
             continue
-        # Save to temp file so we can use fitz / docx
         suffix = os.path.splitext(f.filename)[1]
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             f.save(tmp.name)
@@ -140,26 +180,101 @@ def upload():
     if not all_text.strip():
         return jsonify({
             "uploaded": uploaded_names,
+            "extracted_content": [{"topics": []}],
             "topics": [],
+            "job_matches": [],
             "preview": "",
-            "warning": "Could not extract any text from the uploaded file(s)."
+            "warning": "Could not extract any text from the uploaded file(s).",
         })
 
-    # Extract topics using AI
     try:
-        topics = extract_topics_with_ai(all_text)
+        extracted = extract_extracted_content_with_ai(all_text)
     except Exception as e:
         return jsonify({
             "uploaded": uploaded_names,
+            "extracted_content": [{"topics": []}],
             "topics": [],
+            "job_matches": [],
             "preview": all_text[:300],
-            "warning": f"AI topic extraction failed: {str(e)}"
+            "warning": f"AI extraction failed: {str(e)}",
         })
 
-    return jsonify({
+    topics = topics_flat_from_extracted(extracted)
+
+    # --- Skill-to-Job matching via SentenceTransformer (skillToJob2.py) ---
+    job_matches = []
+    job_warning = None
+    try:
+        job_matches = skills_to_job_roles(topics, top_k=12)
+    except Exception as je:
+        job_warning = f"Job role matching unavailable: {je}"
+
+    body = {
         "uploaded": uploaded_names,
+        "extracted_content": extracted.get("extracted_content", [{"topics": topics}]),
         "topics": topics,
-        "preview": all_text[:400].strip()
+        "job_matches": job_matches,
+        "preview": all_text[:500].strip(),
+    }
+    if job_warning:
+        body["warning"] = job_warning
+    return jsonify(body)
+
+
+@app.route("/api/jobs", methods=["POST"])
+def jobs():
+    """
+    Directly match a list of skills to job roles without needing a file upload.
+
+    Request body (JSON):
+        {
+            "skills": ["Python", "Machine Learning", "SQL"],   // required
+            "top_k": 10                                         // optional, default 12
+        }
+
+    Response:
+        {
+            "skills": [...],
+            "job_matches": [
+                {
+                    "job_title": "Data Scientist",
+                    "match_score": 0.8921,
+                    "skills_required": "...",
+                    "industry": "...",
+                    "experience_level": "...",
+                    "education_required": "..."
+                },
+                ...
+            ]
+        }
+    """
+    data = request.get_json(silent=True) or {}
+
+    # Accept either "skills" (preferred) or "topics" (alias for compatibility)
+    skills = data.get("skills") or data.get("topics") or []
+    top_k = int(data.get("top_k", 12))
+
+    if not skills:
+        return jsonify({"error": "skills list is required and must be non-empty"}), 400
+
+    if not isinstance(skills, list):
+        return jsonify({"error": "skills must be a JSON array of strings"}), 400
+
+    # Sanitise: ensure all entries are non-empty strings
+    skills = [str(s).strip() for s in skills if s and str(s).strip()]
+    if not skills:
+        return jsonify({"error": "No valid skill strings found after sanitising input"}), 400
+
+    try:
+        job_matches = skills_to_job_roles(skills, top_k=top_k)
+    except FileNotFoundError as e:
+        return jsonify({"error": str(e)}), 500
+    except Exception as e:
+        return jsonify({"error": f"Job matching failed: {str(e)}"}), 500
+
+    return jsonify({
+        "skills": skills,
+        "job_matches": job_matches,
     })
 
 
@@ -215,7 +330,6 @@ Rules:
         response = model.generate_content(prompt)
         response_text = response.text.strip()
 
-        # Strip markdown fences if present
         if response_text.startswith("```"):
             lines = response_text.split("\n")
             inner = []
@@ -241,3 +355,144 @@ def search():
     if not query:
         return jsonify({"error": "query is required"}), 400
     return jsonify({"query": query, "results": []})
+
+
+@app.route("/api/skill-gap", methods=["POST"])
+def skill_gap():
+    """
+    Compare user skills against a job's required skills and generate a learning roadmap.
+
+    Body: {
+        "user_skills": ["Python", "SQL", ...],
+        "job_title": "Data Scientist",
+        "job_skills": "Python, R, Machine Learning, ..."
+    }
+
+    Returns: {
+        "matched_skills": [...],
+        "missing_skills": [...],
+        "match_percentage": 60,
+        "roadmap": [
+            {
+                "skill": "Machine Learning",
+                "priority": "high",
+                "reason": "...",
+                "resources": ["...", "..."],
+                "estimated_time": "4-6 weeks"
+            }
+        ]
+    }
+    """
+    data = request.get_json(silent=True) or {}
+    user_skills = data.get("user_skills") or []
+    job_title = (data.get("job_title") or "").strip()
+    job_skills_raw = (data.get("job_skills") or "").strip()
+
+    if not user_skills:
+        return jsonify({"error": "user_skills list is required"}), 400
+    if not job_skills_raw:
+        return jsonify({"error": "job_skills is required"}), 400
+
+    # Parse job skills from comma-separated string
+    job_skills = [s.strip() for s in job_skills_raw.split(",") if s.strip()]
+
+    if not job_skills:
+        return jsonify({"error": "No valid job skills found"}), 400
+
+    # --- Semantic skill matching using sentence-transformers ---
+    try:
+        from sentence_transformers import SentenceTransformer, util
+
+        model = SentenceTransformer("all-mpnet-base-v2")
+
+        user_embeddings = model.encode(
+            [s.lower() for s in user_skills], convert_to_tensor=True
+        )
+        job_embeddings = model.encode(
+            [s.lower() for s in job_skills], convert_to_tensor=True
+        )
+
+        MATCH_THRESHOLD = 0.55
+        matched_skills = []
+        missing_skills = []
+
+        for j_idx, j_skill in enumerate(job_skills):
+            scores = util.cos_sim(job_embeddings[j_idx], user_embeddings)[0]
+            max_score = float(scores.max())
+            if max_score >= MATCH_THRESHOLD:
+                matched_skills.append(j_skill)
+            else:
+                missing_skills.append(j_skill)
+
+    except Exception:
+        # Fallback to simple string matching
+        user_lower = {s.lower().strip() for s in user_skills}
+        matched_skills = []
+        missing_skills = []
+        for js in job_skills:
+            if js.lower().strip() in user_lower:
+                matched_skills.append(js)
+            else:
+                missing_skills.append(js)
+
+    total = len(job_skills)
+    match_percentage = round((len(matched_skills) / total) * 100) if total else 0
+
+    # --- Generate AI roadmap for missing skills ---
+    roadmap = []
+    if missing_skills:
+        try:
+            ai_model = get_gemini_model()
+            missing_str = ", ".join(missing_skills)
+            matched_str = ", ".join(matched_skills) if matched_skills else "None"
+
+            prompt = f"""You are a career development advisor. A student wants to become a "{job_title}".
+
+They already have these skills: {matched_str}
+They are MISSING these skills: {missing_str}
+
+Create a learning roadmap for the missing skills. Return ONLY valid JSON with this exact structure:
+{{
+  "roadmap": [
+    {{
+      "skill": "exact skill name from missing list",
+      "priority": "high|medium|low",
+      "reason": "1 sentence why this skill matters for the {job_title} role",
+      "resources": [
+        "specific course, book, or platform name with brief description"
+      ],
+      "estimated_time": "realistic time estimate like 2-3 weeks"
+    }}
+  ]
+}}
+
+Rules:
+- Include ALL missing skills in the roadmap
+- Order by priority (high first)
+- Give 2-3 specific, real resources per skill (Coursera, Udemy, freeCodeCamp, YouTube channels, books, etc.)
+- Be practical and specific with time estimates
+- Consider what they already know when suggesting resources (e.g. if they know Python, suggest Python-based ML courses)
+- Return ONLY valid JSON, no markdown, no explanation"""
+
+            response = ai_model.generate_content(prompt)
+            response_text = _strip_json_fence(response.text)
+            result = json.loads(response_text)
+            roadmap = result.get("roadmap", [])
+
+        except Exception as e:
+            # Return basic roadmap without AI
+            for skill in missing_skills:
+                roadmap.append({
+                    "skill": skill,
+                    "priority": "medium",
+                    "reason": f"Required for {job_title} roles",
+                    "resources": [f"Search for '{skill} tutorial' on Coursera or YouTube"],
+                    "estimated_time": "2-4 weeks",
+                })
+
+    return jsonify({
+        "matched_skills": matched_skills,
+        "missing_skills": missing_skills,
+        "match_percentage": match_percentage,
+        "roadmap": roadmap,
+    })
