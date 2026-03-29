@@ -1,10 +1,10 @@
 
 
-Hello everyone! <img width="533" height="461" alt="orca-logo" src="https://github.com/user-attachments/assets/b6ed131c-a5b8-4527-8204-c870b84fc1b4" />
+<img width="533" height="461" alt="orca-logo" src="https://github.com/user-attachments/assets/b6ed131c-a5b8-4527-8204-c870b84fc1b4" />
 
 
 
-## Project Name - 📚 Curriculum Mapper ##
+## Project Name -  Curriculum Mapper ##
 
 ## 🎯 Aim
 The aim of this project is to **bridge the gap between academic curricula and industry job requirements** by using AI and Machine Learning to map student skills to relevant job roles.
