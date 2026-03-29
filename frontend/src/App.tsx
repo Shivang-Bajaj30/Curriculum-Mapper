@@ -136,6 +136,7 @@ function App() {
             onClick={() => goTo('home')}
             aria-label="Go to home"
           >
+            <img src="/orca-logo.png" alt="ORCA logo" className="brand-logo" />
             <div className="brand-text">
               <span className="brand-title">ORCA</span>
               <span className="brand-subtitle">Navigate your career with precision.</span>
