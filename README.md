@@ -1,7 +1,10 @@
 
 
-<img width="533" align="centre" height="461" alt="orca-logo" src="https://github.com/user-attachments/assets/b6ed131c-a5b8-4527-8204-c870b84fc1b4" />
-
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/b6ed131c-a5b8-4527-8204-c870b84fc1b4"
+       alt="orca-logo"
+       width="30%">
+</p>
 
 
 ## Project Name -  Curriculum Mapper ##
