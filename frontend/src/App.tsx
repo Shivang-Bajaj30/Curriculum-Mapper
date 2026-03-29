@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import './App.css'
 import * as api from './api/client'
-import type { AnalysisResult } from './api/client'
+import type { JobMatch } from './api/client'
 
 type Theme = 'dark' | 'light'
 type Page = 'home' | 'about' | 'login' | 'signup'
@@ -12,14 +12,15 @@ function App() {
   const [theme, setTheme] = useState<Theme>('dark')
   const [activePage, setActivePage] = useState<Page>('home')
   const [persona, setPersona] = useState<Persona>('students')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchResult, setSearchResult] = useState<string | null>(null)
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
-  const [searching, setSearching] = useState(false)
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([])
   const [extractedTopics, setExtractedTopics] = useState<string[]>([])
+  const [jobMatches, setJobMatches] = useState<JobMatch[]>([])
+  const [uploadWarning, setUploadWarning] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [extractionStatus, setExtractionStatus] = useState<'idle' | 'extracting' | 'done' | 'error'>('idle')
+  const [skillsText, setSkillsText] = useState('')
+  const [skillsMatching, setSkillsMatching] = useState(false)
+  const [skillsMatchError, setSkillsMatchError] = useState<string | null>(null)
   const profileRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -44,29 +45,6 @@ function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  async function handleSearch() {
-    if (!searchQuery.trim()) return
-    if (extractedTopics.length === 0) {
-      setSearchResult('Please upload a curriculum file first so the AI can extract its topics.')
-      return
-    }
-    setSearching(true)
-    setSearchResult(null)
-    setAnalysisResult(null)
-    try {
-      const data = await api.analyze(searchQuery.trim(), extractedTopics)
-      if (data.success && data.analysis) {
-        setAnalysisResult(data.analysis)
-      } else {
-        setSearchResult('Analysis returned no results.')
-      }
-    } catch (e) {
-      setSearchResult(e instanceof Error ? e.message : 'Analysis failed. Make sure the backend is running with a valid GEMINI_API_KEY.')
-    } finally {
-      setSearching(false)
-    }
-  }
-
   async function handleFiles(files: FileList | null) {
     if (!files?.length) return
     const list = Array.from(files)
@@ -74,24 +52,45 @@ function App() {
     setUploadedFiles([])
     setExtractedTopics([])
     setExtractionStatus('extracting')
-    setAnalysisResult(null)
-    setSearchResult(null)
+    setUploadWarning(null)
+    setJobMatches([])
     try {
       const data = await api.upload(list)
       setUploadedFiles(data.uploaded ?? [])
+      if (data.warning) setUploadWarning(data.warning)
+      setJobMatches(data.job_matches ?? [])
       if (data.topics && data.topics.length > 0) {
         setExtractedTopics(data.topics)
         setExtractionStatus('done')
       } else {
         setExtractionStatus('error')
-        setSearchResult(data.warning ?? 'No topics could be extracted from the file.')
       }
     } catch (e) {
       setUploadedFiles([])
+      setJobMatches([])
       setExtractionStatus('error')
-      setSearchResult(e instanceof Error ? e.message : 'Upload failed')
     } finally {
       setUploading(false)
+    }
+  }
+
+  async function handleMatchJobs() {
+    if (!skillsText.trim()) return
+    setSkillsMatching(true)
+    setSkillsMatchError(null)
+    setJobMatches([])
+    setExtractedTopics([])
+    setExtractionStatus('idle')
+    try {
+      const data = await api.matchJobs(skillsText.trim(), 5)
+      setJobMatches(data.job_matches ?? [])
+      const skills = skillsText.split(',').map((s) => s.trim()).filter(Boolean)
+      setExtractedTopics(skills)
+      setExtractionStatus('done')
+    } catch (e) {
+      setSkillsMatchError(e instanceof Error ? e.message : 'Job matching failed.')
+    } finally {
+      setSkillsMatching(false)
     }
   }
 
@@ -267,7 +266,7 @@ function App() {
                       </p>
                       {uploading && <p className="dropzone-status status-loading">⏳ Uploading and extracting topics with AI…</p>}
                       {!uploading && extractionStatus === 'done' && (
-                        <p className="dropzone-status status-success">✅ {extractedTopics.length} topics extracted — ready to analyse</p>
+                        <p className="dropzone-status status-success">✅ {extractedTopics.length} topics extracted — job matches ready</p>
                       )}
                       {!uploading && extractionStatus === 'error' && (
                         <p className="dropzone-status status-error">⚠️ Topic extraction failed. Try a different file.</p>
@@ -279,125 +278,91 @@ function App() {
                   </div>
                 </div>
 
-                <div className="search-shell">
-                  <div className="search-row">
+                {extractionStatus === 'done' && extractedTopics.length > 0 && (
+                  <div className="skills-extraction-panel" aria-label="Extracted skills">
+                    <div className="skills-panel-header">
+                      <h3 className="skills-panel-title">Extracted skills &amp; topics</h3>
+                      <p className="skills-panel-sub">
+                        Pulled from your document into <code>extracted_content[].topics</code> — used to match industry roles.
+                      </p>
+                    </div>
+                    <ul className="skills-chip-list">
+                      {extractedTopics.map((skill) => (
+                        <li key={skill} className="skills-chip">
+                          {skill}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {uploadWarning && extractionStatus === 'done' && (
+                  <p className="upload-warning-banner" role="status">
+                    {uploadWarning}
+                  </p>
+                )}
+
+                {jobMatches.length > 0 && (
+                  <div className="job-matches-panel" aria-label="Suggested job roles">
+                    <div className="job-matches-header">
+                      <h3 className="job-matches-title">Suggested job roles</h3>
+                      <p className="job-matches-sub">
+                      Matched from the project job dataset using your extracted skills (semantic similarity).
+
+                      </p>
+                    </div>
+                    <ul className="job-matches-list">
+                    {jobMatches.slice(0, 5).map((job) => (
+                        <li key={job.job_title} className="job-match-card">
+                          <div className="job-match-top">
+                            <span className="job-match-title">{job.job_title}</span>
+                            <span className="job-match-score">
+                              {(job.match_score * 100).toFixed(2)}%
+                            </span>
+                          </div>
+                          <div className="job-match-meta">
+                            <span>{job.industry}</span>
+                            <span>{job.experience_level}</span>
+                          </div>
+                          <p className="job-match-skills">
+                            <strong>Typical skills:</strong> {job.skills_required}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* ── Manual skills text input ── */}
+                <div className="skills-input-panel">
+                  <div className="skills-input-header">
+                    <h3 className="skills-input-title">Or enter your skills manually</h3>
+                    <p className="skills-input-sub">
+                      Type skills separated by commas — same matching as file upload.
+                    </p>
+                  </div>
+                  <div className="skills-input-row">
                     <input
-                      className="search-input"
+                      className="skills-input-field"
                       type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                      placeholder="Enter a role or keywords (e.g. Data Engineer, UiPath Developer)..."
-                      aria-label="Search within your curriculum"
+                      value={skillsText}
+                      onChange={(e) => setSkillsText(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleMatchJobs()}
+                      placeholder="e.g. Python, Machine Learning, SQL, REST APIs..."
+                      aria-label="Enter skills manually"
                     />
                     <button
-                      className="search-button"
+                      className="skills-input-btn"
                       type="button"
-                      disabled={searching || !searchQuery.trim()}
-                      onClick={handleSearch}
+                      disabled={skillsMatching || !skillsText.trim()}
+                      onClick={handleMatchJobs}
                     >
-                      {searching ? 'Analysing…' : 'Analyse'}
+                      {skillsMatching ? 'Matching…' : 'Find Jobs'}
                     </button>
                   </div>
-                  {searchResult && (
-                    <p className="search-result" role="status">
-                      {searchResult}
-                    </p>
+                  {skillsMatchError && (
+                    <p className="skills-input-error" role="alert">{skillsMatchError}</p>
                   )}
-
-                  {analysisResult && (
-                    <div className="ai-analysis-panel" role="region" aria-label="AI analysis results">
-                      <div className="analysis-header">
-                        <div className="analysis-title-row">
-                          <div className="analysis-icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                              <circle cx="12" cy="12" r="10" />
-                              <path d="M12 16v-4M12 8h.01" />
-                            </svg>
-                          </div>
-                          <div>
-                            <h3 className="analysis-title">AI Curriculum Analysis</h3>
-                            <p className="analysis-query">Role / Keywords: <span>{searchQuery}</span></p>
-                          </div>
-                        </div>
-                        <div className="analysis-score-wrap" aria-label={`Compatibility score: ${analysisResult.compatibility_score}%`}>
-                          <svg className="score-ring" viewBox="0 0 44 44" aria-hidden="true">
-                            <circle className="score-ring-bg" cx="22" cy="22" r="18" />
-                            <circle
-                              className="score-ring-fill"
-                              cx="22" cy="22" r="18"
-                              strokeDasharray={`${(analysisResult.compatibility_score / 100) * 113.1} 113.1`}
-                              style={{ stroke: analysisResult.compatibility_score >= 70 ? '#7c3aed' : analysisResult.compatibility_score >= 40 ? '#2563eb' : '#334155' }}
-                            />
-                          </svg>
-                          <div className="score-label">
-                            <span className="score-value">{analysisResult.compatibility_score}%</span>
-                            <span className="score-text">match</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="analysis-summary">
-                        <p>{analysisResult.summary}</p>
-                      </div>
-
-                      {analysisResult.pointers && analysisResult.pointers.length > 0 && (
-                        <div className="analysis-pointers">
-                          <p className="pointers-label">Compatibility Breakdown</p>
-                          <ul className="pointers-list">
-                            {analysisResult.pointers.map((pointer, idx) => (
-                              <li key={idx} className={`pointer-item pointer-${pointer.match_level}`}>
-                                <div className="pointer-header">
-                                  <span className={`pointer-badge badge-${pointer.match_level}`}>
-                                    {pointer.match_level === 'high' ? '▲ High' : pointer.match_level === 'medium' ? '◆ Medium' : '▼ Low'}
-                                  </span>
-                                  <span className="pointer-topic">{pointer.topic}</span>
-                                </div>
-                                <p className="pointer-relevance">{pointer.relevance}</p>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="search-hints">
-                    <span className="hint-label">Try:</span>
-                    <button
-                      className="hint-pill"
-                      type="button"
-                      onClick={() => {
-                        setSearchQuery('Data Engineer')
-                        setSearchResult(null)
-                        setAnalysisResult(null)
-                      }}
-                    >
-                      Data Engineer
-                    </button>
-                    <button
-                      className="hint-pill"
-                      type="button"
-                      onClick={() => {
-                        setSearchQuery('RPA Developer')
-                        setSearchResult(null)
-                        setAnalysisResult(null)
-                      }}
-                    >
-                      RPA Developer
-                    </button>
-                    <button
-                      className="hint-pill"
-                      type="button"
-                      onClick={() => {
-                        setSearchQuery('Machine Learning, Python, Automation')
-                        setSearchResult(null)
-                        setAnalysisResult(null)
-                      }}
-                    >
-                      ML & Automation skills
-                    </button>
-                  </div>
                 </div>
               </div>
             </section>

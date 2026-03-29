@@ -747,6 +747,200 @@
 .app.theme-light .dropzone-status.status-error   { color: rgba(180, 83, 9, 0.9); }
 
 
+/* Extracted skills + job matches (upload pipeline) */
+.skills-extraction-panel {
+  margin-top: 1rem;
+  padding: 1.25rem 1.35rem;
+  border-radius: 1rem;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(51, 65, 85, 0.5);
+}
+
+.skills-panel-header {
+  margin-bottom: 0.85rem;
+}
+
+.skills-panel-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #f5f5f0;
+}
+
+.skills-panel-sub {
+  margin: 0;
+  font-size: 0.78rem;
+  color: rgba(148, 163, 184, 0.9);
+  line-height: 1.45;
+}
+
+.skills-panel-sub code {
+  font-size: 0.72rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.35rem;
+  background: rgba(30, 41, 59, 0.8);
+  color: rgba(196, 181, 253, 0.95);
+}
+
+.skills-chip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.skills-chip {
+  font-size: 0.78rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: rgba(226, 232, 240, 0.95);
+}
+
+.upload-warning-banner {
+  margin-top: 0.75rem;
+  font-size: 0.82rem;
+  color: rgba(251, 191, 36, 0.95);
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.65rem;
+  background: rgba(120, 53, 15, 0.25);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+}
+
+.job-matches-panel {
+  margin-top: 1rem;
+  padding: 1.25rem 1.35rem;
+  border-radius: 1rem;
+  background: linear-gradient(
+    145deg,
+    rgba(15, 23, 42, 0.75) 0%,
+    rgba(5, 8, 20, 0.92) 100%
+  );
+  border: 1px solid rgba(37, 99, 235, 0.25);
+}
+
+.job-matches-header {
+  margin-bottom: 1rem;
+}
+
+.job-matches-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #f5f5f0;
+}
+
+.job-matches-sub {
+  margin: 0;
+  font-size: 0.78rem;
+  color: rgba(148, 163, 184, 0.9);
+  line-height: 1.45;
+}
+
+.job-matches-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 28rem;
+  overflow-y: auto;
+}
+
+.job-match-card {
+  padding: 0.9rem 1rem;
+  border-radius: 0.75rem;
+  background: rgba(30, 41, 59, 0.45);
+  border: 1px solid rgba(51, 65, 85, 0.55);
+}
+
+.job-match-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.45rem;
+}
+
+.job-match-title {
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: #e2e8f0;
+}
+
+.job-match-score {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: rgba(167, 139, 250, 0.95);
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.4rem;
+  background: rgba(124, 58, 237, 0.2);
+}
+
+.job-match-desc {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: rgba(203, 213, 225, 0.88);
+}
+
+.job-match-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  font-size: 0.72rem;
+  color: rgba(148, 163, 184, 0.85);
+  margin-bottom: 0.45rem;
+}
+
+.job-match-skills {
+  margin: 0;
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: rgba(186, 230, 253, 0.85);
+}
+
+.job-match-skills strong {
+  color: rgba(148, 163, 184, 0.95);
+  font-weight: 600;
+}
+
+.app.theme-light .skills-extraction-panel,
+.app.theme-light .job-matches-panel {
+  background: rgba(248, 250, 252, 0.95);
+  border-color: rgba(148, 163, 184, 0.45);
+}
+
+.app.theme-light .skills-panel-title,
+.app.theme-light .job-matches-title {
+  color: #0f172a;
+}
+
+.app.theme-light .skills-panel-sub,
+.app.theme-light .job-matches-sub {
+  color: rgba(51, 65, 85, 0.9);
+}
+
+.app.theme-light .skills-chip {
+  background: rgba(219, 234, 254, 0.9);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: #1e293b;
+}
+
+.app.theme-light .job-match-card {
+  background: rgba(241, 245, 249, 0.95);
+  border-color: rgba(203, 213, 225, 0.9);
+}
+
+.app.theme-light .job-match-desc {
+  color: rgba(51, 65, 85, 0.92);
+}
+
 /* ─────────────────────────────────────────
    AI Analysis Output Panel
 ───────────────────────────────────────── */
@@ -1706,3 +1900,12 @@
   background: linear-gradient(135deg, #fbbf24, #facc15);
   color: #0f172a;
 }
+
+.skills-input-panel { margin: 1.5rem 0; padding: 1.25rem 1.5rem; border: 1px solid var(--border); border-radius: 12px; }
+.skills-input-title { font-size: 1rem; font-weight: 600; margin-bottom: 0.25rem; }
+.skills-input-sub { font-size: 0.82rem; opacity: 0.6; margin-bottom: 0.75rem; }
+.skills-input-row { display: flex; gap: 0.75rem; }
+.skills-input-field { flex: 1; padding: 0.6rem 1rem; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 0.9rem; }
+.skills-input-btn { padding: 0.6rem 1.25rem; border-radius: 8px; background: var(--accent); color: #fff; border: none; cursor: pointer; font-weight: 600; white-space: nowrap; }
+.skills-input-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.skills-input-error { margin-top: 0.5rem; font-size: 0.85rem; color: #f87171; }
