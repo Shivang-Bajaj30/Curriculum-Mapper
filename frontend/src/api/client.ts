@@ -114,3 +114,39 @@ export async function analyze(query: string, topics?: string[]): Promise<{ succe
   }
   return res.json()
 }
+
+export interface RoadmapItem {
+  skill: string
+  priority: 'high' | 'medium' | 'low'
+  reason: string
+  resources: string[]
+  estimated_time: string
+}
+
+export interface SkillGapResponse {
+  matched_skills: string[]
+  missing_skills: string[]
+  match_percentage: number
+  roadmap: RoadmapItem[]
+}
+
+export async function getSkillGap(
+  userSkills: string[],
+  jobTitle: string,
+  jobSkills: string
+): Promise<SkillGapResponse> {
+  const res = await fetch(`${API_BASE}/api/skill-gap`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      user_skills: userSkills,
+      job_title: jobTitle,
+      job_skills: jobSkills,
+    }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error || `Skill gap analysis failed: ${res.status}`)
+  }
+  return res.json()
+}

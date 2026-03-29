@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
 import './App.css'
 import * as api from './api/client'
-import type { JobMatch } from './api/client'
+import type { JobMatch, SkillGapResponse } from './api/client'
 
 type Theme = 'dark' | 'light'
-type Page = 'home' | 'about' | 'login' | 'signup'
+type Page = 'home' | 'login' | 'signup'
 type Persona = 'students' | 'institutions' | 'industry'
 
 function App() {
@@ -21,6 +21,10 @@ function App() {
   const [skillsText, setSkillsText] = useState('')
   const [skillsMatching, setSkillsMatching] = useState(false)
   const [skillsMatchError, setSkillsMatchError] = useState<string | null>(null)
+  const [selectedJobForGap, setSelectedJobForGap] = useState<string | null>(null)
+  const [skillGapData, setSkillGapData] = useState<SkillGapResponse | null>(null)
+  const [skillGapLoading, setSkillGapLoading] = useState(false)
+  const [skillGapError, setSkillGapError] = useState<string | null>(null)
   const profileRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -94,6 +98,27 @@ function App() {
     }
   }
 
+  async function handleViewSkillGap(job: JobMatch) {
+    if (selectedJobForGap === job.job_title) {
+      setSelectedJobForGap(null)
+      setSkillGapData(null)
+      setSkillGapError(null)
+      return
+    }
+    setSelectedJobForGap(job.job_title)
+    setSkillGapLoading(true)
+    setSkillGapError(null)
+    setSkillGapData(null)
+    try {
+      const data = await api.getSkillGap(extractedTopics, job.job_title, job.skills_required)
+      setSkillGapData(data)
+    } catch (e) {
+      setSkillGapError(e instanceof Error ? e.message : 'Skill gap analysis failed.')
+    } finally {
+      setSkillGapLoading(false)
+    }
+  }
+
   const personaImage =
     persona === 'students'
       ? '/persona-students.png'
@@ -125,13 +150,7 @@ function App() {
             >
               Home
             </button>
-            <button
-              className={`nav-link ${activePage === 'about' ? 'nav-link-active' : ''}`}
-              type="button"
-              onClick={() => goTo('about')}
-            >
-              About
-            </button>
+
 
             <div className="theme-switch" role="group" aria-label="Theme">
               <button
@@ -205,10 +224,10 @@ function App() {
                   <button className="profile-menu-item" type="button" role="menuitem" onClick={() => goTo('home')}>
                     Profile
                   </button>
-                  <button className="profile-menu-item" type="button" role="menuitem" onClick={() => goTo('about')}>
+                  <button className="profile-menu-item" type="button" role="menuitem">
                     Settings
                   </button>
-                  <button className="profile-menu-item" type="button" role="menuitem" onClick={() => goTo('about')}>
+                  <button className="profile-menu-item" type="button" role="menuitem">
                     Privacy Policy
                   </button>
                   <button className="profile-menu-item" type="button" role="menuitem" onClick={() => goTo('login')}>
@@ -327,6 +346,88 @@ function App() {
                           <p className="job-match-skills">
                             <strong>Typical skills:</strong> {job.skills_required}
                           </p>
+                          <button
+                            className={`skill-gap-btn ${selectedJobForGap === job.job_title ? 'skill-gap-btn-active' : ''}`}
+                            type="button"
+                            onClick={() => handleViewSkillGap(job)}
+                            disabled={skillGapLoading && selectedJobForGap === job.job_title}
+                          >
+                            {skillGapLoading && selectedJobForGap === job.job_title
+                              ? '⏳ Analyzing…'
+                              : selectedJobForGap === job.job_title
+                                ? '✕ Close Gap Analysis'
+                                : '🔍 View Skill Gap & Roadmap'}
+                          </button>
+
+                          {selectedJobForGap === job.job_title && skillGapError && (
+                            <p className="skill-gap-error" role="alert">{skillGapError}</p>
+                          )}
+
+                          {selectedJobForGap === job.job_title && skillGapData && (
+                            <div className="skill-gap-panel" aria-label="Skill gap analysis">
+                              <div className="skill-gap-header">
+                                <div className="skill-gap-meter">
+                                  <div className="skill-gap-meter-fill" style={{ width: `${skillGapData.match_percentage}%` }} />
+                                </div>
+                                <span className="skill-gap-pct">{skillGapData.match_percentage}% skill match</span>
+                              </div>
+
+                              <div className="skill-gap-columns">
+                                <div className="skill-gap-col">
+                                  <h4 className="skill-gap-col-title skill-gap-have">✅ Skills you have ({skillGapData.matched_skills.length})</h4>
+                                  <ul className="skill-gap-chips">
+                                    {skillGapData.matched_skills.map((s) => (
+                                      <li key={s} className="skill-chip-matched">{s}</li>
+                                    ))}
+                                    {skillGapData.matched_skills.length === 0 && (
+                                      <li className="skill-chip-empty">No matching skills found</li>
+                                    )}
+                                  </ul>
+                                </div>
+                                <div className="skill-gap-col">
+                                  <h4 className="skill-gap-col-title skill-gap-missing">⚠️ Skills to learn ({skillGapData.missing_skills.length})</h4>
+                                  <ul className="skill-gap-chips">
+                                    {skillGapData.missing_skills.map((s) => (
+                                      <li key={s} className="skill-chip-missing">{s}</li>
+                                    ))}
+                                    {skillGapData.missing_skills.length === 0 && (
+                                      <li className="skill-chip-empty">You have all required skills! 🎉</li>
+                                    )}
+                                  </ul>
+                                </div>
+                              </div>
+
+                              {skillGapData.roadmap.length > 0 && (
+                                <div className="roadmap-section">
+                                  <h4 className="roadmap-title">🗺️ Learning Roadmap</h4>
+                                  <p className="roadmap-subtitle">Personalized path to close your skill gaps</p>
+                                  <div className="roadmap-timeline">
+                                    {skillGapData.roadmap.map((item, idx) => (
+                                      <div key={item.skill} className={`roadmap-card roadmap-${item.priority}`}>
+                                        <div className="roadmap-card-header">
+                                          <span className="roadmap-step">{idx + 1}</span>
+                                          <div className="roadmap-card-info">
+                                            <span className="roadmap-skill-name">{item.skill}</span>
+                                            <span className={`roadmap-priority priority-${item.priority}`}>{item.priority}</span>
+                                          </div>
+                                          <span className="roadmap-time">⏱ {item.estimated_time}</span>
+                                        </div>
+                                        <p className="roadmap-reason">{item.reason}</p>
+                                        <div className="roadmap-resources">
+                                          <span className="roadmap-resources-label">Resources:</span>
+                                          <ul className="roadmap-resources-list">
+                                            {item.resources.map((r, ri) => (
+                                              <li key={ri}>{r}</li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -514,16 +615,6 @@ function App() {
           </>
         )}
 
-        {activePage === 'about' && (
-          <section className="content-page">
-            <p className="section-kicker">About</p>
-            <h2 className="section-title">Built with educators, for educators.</h2>
-            <p className="section-body">
-              Curriculum Mapper was designed alongside programme directors, accreditation specialists, and instructional
-              designers who needed a clearer view of how everything connects.
-            </p>
-          </section>
-        )}
 
         {(activePage === 'login' || activePage === 'signup') && (
           <section className="auth-page" aria-label="Authentication">

@@ -355,3 +355,144 @@ def search():
     if not query:
         return jsonify({"error": "query is required"}), 400
     return jsonify({"query": query, "results": []})
+
+
+@app.route("/api/skill-gap", methods=["POST"])
+def skill_gap():
+    """
+    Compare user skills against a job's required skills and generate a learning roadmap.
+
+    Body: {
+        "user_skills": ["Python", "SQL", ...],
+        "job_title": "Data Scientist",
+        "job_skills": "Python, R, Machine Learning, ..."
+    }
+
+    Returns: {
+        "matched_skills": [...],
+        "missing_skills": [...],
+        "match_percentage": 60,
+        "roadmap": [
+            {
+                "skill": "Machine Learning",
+                "priority": "high",
+                "reason": "...",
+                "resources": ["...", "..."],
+                "estimated_time": "4-6 weeks"
+            }
+        ]
+    }
+    """
+    data = request.get_json(silent=True) or {}
+    user_skills = data.get("user_skills") or []
+    job_title = (data.get("job_title") or "").strip()
+    job_skills_raw = (data.get("job_skills") or "").strip()
+
+    if not user_skills:
+        return jsonify({"error": "user_skills list is required"}), 400
+    if not job_skills_raw:
+        return jsonify({"error": "job_skills is required"}), 400
+
+    # Parse job skills from comma-separated string
+    job_skills = [s.strip() for s in job_skills_raw.split(",") if s.strip()]
+
+    if not job_skills:
+        return jsonify({"error": "No valid job skills found"}), 400
+
+    # --- Semantic skill matching using sentence-transformers ---
+    try:
+        from sentence_transformers import SentenceTransformer, util
+
+        model = SentenceTransformer("all-mpnet-base-v2")
+
+        user_embeddings = model.encode(
+            [s.lower() for s in user_skills], convert_to_tensor=True
+        )
+        job_embeddings = model.encode(
+            [s.lower() for s in job_skills], convert_to_tensor=True
+        )
+
+        MATCH_THRESHOLD = 0.55
+        matched_skills = []
+        missing_skills = []
+
+        for j_idx, j_skill in enumerate(job_skills):
+            scores = util.cos_sim(job_embeddings[j_idx], user_embeddings)[0]
+            max_score = float(scores.max())
+            if max_score >= MATCH_THRESHOLD:
+                matched_skills.append(j_skill)
+            else:
+                missing_skills.append(j_skill)
+
+    except Exception:
+        # Fallback to simple string matching
+        user_lower = {s.lower().strip() for s in user_skills}
+        matched_skills = []
+        missing_skills = []
+        for js in job_skills:
+            if js.lower().strip() in user_lower:
+                matched_skills.append(js)
+            else:
+                missing_skills.append(js)
+
+    total = len(job_skills)
+    match_percentage = round((len(matched_skills) / total) * 100) if total else 0
+
+    # --- Generate AI roadmap for missing skills ---
+    roadmap = []
+    if missing_skills:
+        try:
+            ai_model = get_gemini_model()
+            missing_str = ", ".join(missing_skills)
+            matched_str = ", ".join(matched_skills) if matched_skills else "None"
+
+            prompt = f"""You are a career development advisor. A student wants to become a "{job_title}".
+
+They already have these skills: {matched_str}
+They are MISSING these skills: {missing_str}
+
+Create a learning roadmap for the missing skills. Return ONLY valid JSON with this exact structure:
+{{
+  "roadmap": [
+    {{
+      "skill": "exact skill name from missing list",
+      "priority": "high|medium|low",
+      "reason": "1 sentence why this skill matters for the {job_title} role",
+      "resources": [
+        "specific course, book, or platform name with brief description"
+      ],
+      "estimated_time": "realistic time estimate like 2-3 weeks"
+    }}
+  ]
+}}
+
+Rules:
+- Include ALL missing skills in the roadmap
+- Order by priority (high first)
+- Give 2-3 specific, real resources per skill (Coursera, Udemy, freeCodeCamp, YouTube channels, books, etc.)
+- Be practical and specific with time estimates
+- Consider what they already know when suggesting resources (e.g. if they know Python, suggest Python-based ML courses)
+- Return ONLY valid JSON, no markdown, no explanation"""
+
+            response = ai_model.generate_content(prompt)
+            response_text = _strip_json_fence(response.text)
+            result = json.loads(response_text)
+            roadmap = result.get("roadmap", [])
+
+        except Exception as e:
+            # Return basic roadmap without AI
+            for skill in missing_skills:
+                roadmap.append({
+                    "skill": skill,
+                    "priority": "medium",
+                    "reason": f"Required for {job_title} roles",
+                    "resources": [f"Search for '{skill} tutorial' on Coursera or YouTube"],
+                    "estimated_time": "2-4 weeks",
+                })
+
+    return jsonify({
+        "matched_skills": matched_skills,
+        "missing_skills": missing_skills,
+        "match_percentage": match_percentage,
+        "roadmap": roadmap,
+    })
