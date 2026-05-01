@@ -1,9 +1,10 @@
 /**
  * API client for the Curriculum Mapper backend.
  * In dev, Vite proxies /api to the Flask server (see vite.config.ts).
+ * In production, use the VITE_API_BASE environment variable.
  */
 
-const API_BASE = ''
+const API_BASE = import.meta.env.VITE_API_BASE || ''
 
 export async function getHealth(): Promise<{ status: string; message: string }> {
   const res = await fetch(`${API_BASE}/api/health`)
